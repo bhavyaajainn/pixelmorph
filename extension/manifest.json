@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "PixelMorph",
+  "short_name": "PixelMorph",
+  "version": "1.0.0",
+  "description": "Turn any live website into a fully customizable design sandbox.",
+  "action": {
+    "default_title": "PixelMorph"
+  },
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["next_assets/*", "*.png", "*.svg", "*.ico"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

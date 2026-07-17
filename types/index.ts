@@ -99,6 +99,9 @@ export interface CapturedBackground {
 }
 
 export interface PixelMorphState {
+  isAILoading: boolean;
+  aiError: string | null;
+  aiScreenshot: string | null;
   isEnabled: boolean;
   activeTab: TabId;
   selectedElement: string | null;
@@ -130,6 +133,7 @@ export interface PixelMorphState {
 }
 
 export interface PixelMorphActions {
+  aiRedesign: () => Promise<void>;
   setEnabled: (v: boolean) => void;
   setActiveTab: (tab: TabId) => void;
   setSelectedElement: (sel: string | null) => void;

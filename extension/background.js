@@ -72,6 +72,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   // Box capture "done" signal: write a tiny flag — popup polls for it,
   // then pulls the actual data directly from the content script via tabs.sendMessage
+  if (message.type === "CAPTURE_SCREENSHOT") {
+    if (!activeTabId) { sendResponse({ screenshot: null }); return true; }
+    chrome.tabs.get(activeTabId, (tab) => {
+      if (chrome.runtime.lastError || !tab?.windowId) { sendResponse({ screenshot: null }); return; }
+      chrome.tabs.captureVisibleTab(tab.windowId, { format: "jpeg", quality: 70 }, (dataUrl) => {
+        if (chrome.runtime.lastError || !dataUrl) { sendResponse({ screenshot: null }); return; }
+        // Strip the data:image/jpeg;base64, prefix — Gemini wants raw base64
+        sendResponse({ screenshot: dataUrl.split(",")[1] ?? null });
+      });
+    });
+    return true;
+  }
+
   if (message.type === "PIXELMORPH_BOX_DONE") {
     console.log("STEP 6 (background): Received BOX_DONE. Writing flag to storage...");
     chrome.storage.local.set({ pixelmorph_box_done: Date.now() }, () => {

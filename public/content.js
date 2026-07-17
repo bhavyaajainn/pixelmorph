@@ -12,7 +12,8 @@ if (window.__pixelMorphRegistered) {
   // just re-apply saved state (handled by the guard above).
   if (window.__pixelMorphRegistered) return;
   window.__pixelMorphRegistered = true;
-  const STYLE_ID = "pixelmorph-styles";
+  const STYLE_ID  = "pixelmorph-styles";
+  const CUSTOM_ID = "pixelmorph-custom";
   const OVERLAY_ID = "pixelmorph-overlay";
   let currentState = null;
   let hoveredEl = null;
@@ -64,11 +65,16 @@ if (window.__pixelMorphRegistered) {
     let el = document.getElementById(STYLE_ID);
     if (!el) { el = document.createElement("style"); el.id = STYLE_ID; document.head.appendChild(el); }
 
-    if (!state.isEnabled) { el.textContent = ""; return; }
+    if (!state.isEnabled) {
+      el.textContent = "";
+      const c = document.getElementById(CUSTOM_ID); if (c) c.textContent = "";
+      return;
+    }
 
     const {
       colorTokens = [], borderRadius = 8, fontScale = 100,
       textOverrides = [], brandFind = "", brandReplace = "",
+      customCSS = "",
     } = state;
 
     // Look up by label so order doesn't matter
@@ -116,9 +122,8 @@ if (window.__pixelMorphRegistered) {
     if (accent) css += `a, [class*="link"] { color: ${accent} !important; }\n`;
     if (primary) {
       css += `button[class*="primary"], [class*="btn-primary"], [class*="button--primary"],`
-           + `[class*="btn--primary"], [class*="-primary-btn"], input[type="submit"],`
-           + `[class*="cta"], [class*="CTA"] `
-           + `{ background-color: ${primary} !important; border-color: ${primary} !important; }\n`;
+           + `[class*="cta"], [class*="CTA"], input[type="submit"]`
+           + ` { background-color: ${primary} !important; border-color: ${primary} !important; }\n`;
     }
 
     // ── 3. Font scale ──────────────────────────────────────────────────────
@@ -130,6 +135,11 @@ if (window.__pixelMorphRegistered) {
          + ` { border-radius: ${borderRadius}px !important; }\n`;
 
     el.textContent = css;
+
+    // Inject AI-generated animations / effects into a separate tag
+    let customEl = document.getElementById(CUSTOM_ID);
+    if (!customEl) { customEl = document.createElement("style"); customEl.id = CUSTOM_ID; document.head.appendChild(customEl); }
+    customEl.textContent = customCSS || "";
 
     applyTextOverrides(textOverrides);
     if (brandFind && brandReplace && brandFind !== brandReplace) applyBrandReplace(brandFind, brandReplace);

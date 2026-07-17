@@ -22,7 +22,7 @@ function Section({ children, noBorder }: { children: React.ReactNode; noBorder?:
 export default function StyleTab() {
   const {
     selectedElementInfo, isPicking, isCapturing,
-    startElementPicker, cancelElementPicker, capturePageStyles,
+    startElementPicker, cancelElementPicker, captureColors: capturePageStyles,
     colorTokens, updateColorToken, addColorToken,
     fontRoles, activeFontId, setActiveFont,
     borderRadius, setBorderRadius,

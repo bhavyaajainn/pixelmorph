@@ -60,6 +60,10 @@ export function PixelMorphProvider({ children }: { children: ReactNode }) {
   const [selectedNodeId,      setSelectedNodeId]      = useState<number | null>(null);
   const [nodeChanges,         setNodeChanges]         = useState<Record<number, NodeChange>>({});
   const [boxCaptures,         setBoxCaptures]         = useState<DOMNode[][]>([]);
+  const [isAILoading,         setIsAILoading]         = useState(false);
+  const [aiError,             setAIError]             = useState<string | null>(null);
+  const [aiScreenshot,        setAiScreenshot]        = useState<string | null>(null);
+  const geminiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY ?? "";
 
   const tabIdRef          = useRef<number | null>(null);
   const nodeLocatorRef    = useRef<Record<number, { tag: string; text: string | null; elId: string | null; classes: string[]; path?: string }>>({});
@@ -234,7 +238,7 @@ export function PixelMorphProvider({ children }: { children: ReactNode }) {
   const selectNode = useCallback((id: number | null) => {
     setSelectedNodeId(id);
     if (!isExt()) return;
-    const locator = nodeLocatorRef.current[id] ?? null;
+    const locator = id !== null ? (nodeLocatorRef.current[id] ?? null) : null;
     sendToTab("PIXELMORPH_HIGHLIGHT_NODE", { pmId: id, locator }, () => {});
   }, [sendToTab]);
 
@@ -376,7 +380,83 @@ export function PixelMorphProvider({ children }: { children: ReactNode }) {
 
   const undo = useCallback(() => setChangesCount(c => Math.max(0, c - 1)), []);
 
+  const aiRedesign = useCallback(async () => {
+    const key = geminiKey;
+
+    if (!key) {
+      setAIError("Gemini API key is not configured.");
+      return;
+    }
+
+    setIsAILoading(true);
+    setAIError(null);
+
+    try {
+      // Always fetch fresh colors from the live page before redesigning
+      const pageColors = await new Promise<{ label: string; hex: string }[]>(resolve => {
+        if (!isExt()) {
+          resolve(colorTokens.map(t => ({ label: t.label, hex: t.hex })));
+          return;
+        }
+        sendToTab("PIXELMORPH_CAPTURE_COLORS", {}, (result: any) => {
+          resolve((result?.colors ?? []).map((c: any) => ({ label: c.label, hex: c.hex })));
+        });
+      });
+
+      const screenshot = isExt()
+        ? await new Promise<string | null>(resolve =>
+            cr().runtime.sendMessage({ type: "CAPTURE_SCREENSHOT" }, (res: any) => {
+              if ((cr() as any).runtime.lastError) resolve(null);
+              else resolve(res?.screenshot ?? null);
+            })
+          )
+        : null;
+
+      if (screenshot) setAiScreenshot(`data:image/jpeg;base64,${screenshot}`);
+
+      const { geminiRedesign } = await import("@/lib/gemini");
+      const result = await geminiRedesign(key, {
+        colors: pageColors.length ? pageColors : colorTokens.map(t => ({ label: t.label, hex: t.hex })),
+        fonts:  fontRoles.map(f => ({ role: f.role, family: f.family })),
+        site:   currentSite,
+        screenshot,
+      });
+
+      const newTokens = result.colorTokens.map((t, i) => ({
+        id: String(Date.now() + i),
+        label: t.label,
+        hex: t.hex,
+      }));
+
+      setColorTokens(newTokens);
+      setBorderRadiusRaw(result.borderRadius);
+      setFontScaleRaw(result.fontScale);
+      setChangesCount(c => c + 1);
+
+      // Push styles live to the page immediately
+      if (isExt()) {
+        sendToTab("PIXELMORPH_UPDATE", {
+          payload: {
+            isEnabled: true,
+            colorTokens: newTokens,
+            borderRadius: result.borderRadius,
+            fontScale: result.fontScale,
+            textOverrides,
+            brandFind,
+            brandReplace,
+            customCSS: result.customCSS ?? "",
+          },
+        }, () => {});
+      }
+    } catch (e: any) {
+      setAIError(e.message ?? "AI redesign failed.");
+    } finally {
+      setIsAILoading(false);
+    }
+  }, [colorTokens, fontRoles, currentSite, sendToTab, textOverrides, brandFind, brandReplace]);
+
   const value: ContextValue = {
+    isAILoading, aiError, aiScreenshot,
     isEnabled, activeTab, selectedElement, selectedElementInfo, isPicking, isCapturing, isScanning, captureError,
     domTree, selectedNodeId, nodeChanges, boxCaptures,
     colorTokens, fontRoles, activeFontId, borderRadius, paddingScale, fontScale,
@@ -384,6 +464,7 @@ export function PixelMorphProvider({ children }: { children: ReactNode }) {
     assets: [] as any,
     presets, activePresetId, currentSite, changesCount,
     capturedImages, capturedBackgrounds,
+    aiRedesign,
     setEnabled, setActiveTab, setSelectedElement, startElementPicker, cancelElementPicker,
     scanDOM, selectNode, applyNodeChange, undoAll, startBoxSelect, clearBoxCapture, reorderBoxCaptures,
     captureColors, captureText, captureResources,
